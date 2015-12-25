@@ -1,29 +1,76 @@
-console.log("it works! :)");
-
 var gpio = require('rpi-gpio');
+var moment = require('moment');
+var async = require('async');
 var mailer = require('./config/node-mailer.js');
 
-gpio.on('change', function(channel, value) {
-	console.log('Channel ' + channel + ' value is now ' + value);
-	doorChange(value);
-});
+var lastMailSent = 0;
 
-gpio.setup(12, gpio.DIR_IN, gpio.EDGE_BOTH);
+log("#####################################");
+log("######## Monitor started! :) ########");
+log("#####################################");
 
-function doorChange(value) {
-	console.log("door open = " + value);
-//	sendMail("door open = " + value);
+function start() {
+    async.series([
+			// set up pin for single read
+            function(callback) {
+                gpio.setup(7, gpio.DIR_IN, callback);
+            },
+			// read current door state and log it with doorChange()
+            function(callback) {
+                gpio.read(7, function(err, value) {
+                    doorChange(value);
+                    callback();
+                });
+            },
+			// destroy all
+            function(callback) {
+                gpio.destroy(callback);
+            },
+			// instead of single read, start listening for changes
+			function(callback) {
+				gpio.setup(7, gpio.DIR_IN, gpio.EDGE_BOTH);
+				gpio.on('change', function(channel, value) {
+					doorChange(value);
+				});
+			}
+        ],
+        function(err, results) {
+			log("#####################################");
+			log("######## Monitor stopped! :( ########");
+			log("#####################################");
+        }
+    );
+}
+
+function doorChange(value, callback) {
+    if (value === true) {
+        log("Door opened");
+        if (lastMailSent < (Date.now() - 10000)) {
+            sendMail("Door opened");
+        } else {
+            log("Already sent email");
+        }
+    } else {
+        log("Door closed");
+    }
 }
 
 function sendMail(text) {
-	var mailOptions = {
-		from: 'node-mailer <verstegen.daan@gmail.com', // sender address
-		to: 'verstegen.daan@gmail.com', // list of receivers
-		subject: 'Sup bruh!', // Subject line
-		text: text // plaintext body
-	};
-	mailer.transporter.sendMail(mailOptions, function(err, info) {
-		if (err) return console.error(err);
-		console.log(info.response);
-	});
+    lastMailSent = Date.now();
+    var mailOptions = {
+        from: 'Pi Door Monitor <verstegen.daan@gmail.com', // sender address
+        to: 'verstegen.daan@gmail.com', // list of receivers
+        subject: 'Door activity', // Subject line
+        text: text // plaintext body
+    };
+    mailer.transporter.sendMail(mailOptions, function(err, info) {
+        if (err) return console.error(err);
+        log(info.response);
+    });
 }
+
+function log(text) {
+    console.log(moment(Date.now()).format("YYYY-MM-DD HH:mm:ss") + " " + text);
+}
+
+start();
