@@ -1,16 +1,21 @@
-var gpio = require('rpi-gpio');
-var moment = require('moment');
-var async = require('async');
+// TODO add express and listen for a request for door data, then return with
+// json...
+
+var gpio   = require('rpi-gpio');
+var async  = require('async');
 var mailer = require('./config/node-mailer.js');
+var logger = require('./simple-logger.js');
 
 var lastMailSent = 0;
 
-log("#####################################");
-log("######## Monitor started! :) ########");
-log("#####################################");
-
 function start() {
     async.series([
+			function(callback) {
+				logger.log("#####################################");
+				logger.log("######## Monitor started! :) ########");
+				logger.log("#####################################");
+				callback();
+			},
 			// set up pin for single read
             function(callback) {
                 gpio.setup(7, gpio.DIR_IN, callback);
@@ -22,7 +27,7 @@ function start() {
                     callback();
                 });
             },
-			// destroy all
+			// reset all pins
             function(callback) {
                 gpio.destroy(callback);
             },
@@ -35,23 +40,23 @@ function start() {
 			}
         ],
         function(err, results) {
-			log("#####################################");
-			log("######## Monitor stopped! :( ########");
-			log("#####################################");
+			logger.log("#####################################");
+			logger.log("######## Monitor stopped! :( ########");
+			logger.log("#####################################");
         }
     );
 }
 
 function doorChange(value, callback) {
     if (value === true) {
-        log("Door opened");
+        logger.log("Door opened");
         if (lastMailSent < (Date.now() - 10000)) {
             sendMail("Door opened");
         } else {
-            log("Already sent email");
+            logger.log("Already sent email");
         }
     } else {
-        log("Door closed");
+        logger.log("Door closed");
     }
 }
 
@@ -63,14 +68,11 @@ function sendMail(text) {
         subject: 'Door activity', // Subject line
         text: text // plaintext body
     };
+	// TODO send post req to server
     mailer.transporter.sendMail(mailOptions, function(err, info) {
         if (err) return console.error(err);
-        log(info.response);
+        logger.log(info.response);
     });
-}
-
-function log(text) {
-    console.log(moment(Date.now()).format("YYYY-MM-DD HH:mm:ss") + " " + text);
 }
 
 start();
