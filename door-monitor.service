@@ -1,0 +1,15 @@
+[Unit]
+Description=Pi door monitor
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/node /home/pi/www/zero-door-monitor/app.js
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=door-monitor
+User=pi
+
+[Install]
+Wants=network.target
+WantedBy=multi-user.target
