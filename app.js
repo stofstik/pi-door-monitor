@@ -1,6 +1,4 @@
-// TODO add express and listen for a request for door data, then return with
-// json...
-
+var request= require('request');
 var gpio   = require('rpi-gpio');
 var async  = require('async');
 var mailer = require('./config/node-mailer.js');
@@ -42,15 +40,17 @@ function start() {
         function(err, results) {
 			logger.log("#####################################");
 			logger.log("######## Monitor stopped! :( ########");
+			logger.log("########    Did you sudo?    ########");
 			logger.log("#####################################");
         }
     );
 }
 
 function doorChange(value, callback) {
+	// but only send an email if door is open
     if (value === true) {
-        logger.log("Door opened");
         if (lastMailSent < (Date.now() - 10000)) {
+//			sendPost(value);
             sendMail("Door opened");
         } else {
             logger.log("Already sent email");
@@ -68,11 +68,25 @@ function sendMail(text) {
         subject: 'Door activity', // Subject line
         text: text // plaintext body
     };
-	// TODO send post req to server
     mailer.transporter.sendMail(mailOptions, function(err, info) {
         if (err) return console.error(err);
         logger.log(info.response);
     });
+}
+
+// Send a post request to the server containing the data
+function sendPost(value) {
+	var url = 'http://192.168.0.100:3000/doors/postData/';
+	url += Date.now();
+	url += "/";
+	url += value;
+	request.post(url, function(err, response, body) {
+		if (!err && response.statusCode == 200) {
+			logger.log("Server response: " + body);
+		} else {
+			logger.log(err);
+		}
+	});
 }
 
 start();
